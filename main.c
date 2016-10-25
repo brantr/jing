@@ -100,7 +100,7 @@ void create_normal_distribution(struct Particle *p, int N, double sigma)
     p->z[i] = dz;
   }
 }
-void create_uniform_distribution(struct Particle *p, int N, double a)
+void create_uniform_distribution(struct Particle *p, int N, double a, int id)
 {
   double dx;
   double dy;
@@ -109,6 +109,7 @@ void create_uniform_distribution(struct Particle *p, int N, double a)
   p->x = (double *) calloc(N,sizeof(double));
   p->y = (double *) calloc(N,sizeof(double));
   p->z = (double *) calloc(N,sizeof(double));
+  set_rng_uniform_seed(1337+id);
 
   for(int i=0;i<N;i++)
   {
@@ -165,8 +166,10 @@ int main(int argc, char **argv)
   int myid;
   int numprocs;
 
-  if(argc==3)
+  if(argc>=3)
     ns = atoi(argv[2]);
+  if(argc>=4)
+    N = atoi(argv[3]);
 
   MPI_Init(&argc,&argv);
   MPI_Comm world = MPI_COMM_WORLD;
@@ -180,7 +183,7 @@ int main(int argc, char **argv)
     set_rng_gaussian_seed(1337+id);
 
     //create_normal_distribution(&p,N,sigma);
-    create_uniform_distribution(&p,N,A);
+    create_uniform_distribution(&p,N,A,id);
 
 
     //printf("p[0] %e %e %e\n",p.x[0],p.y[0],p.z[0]);
@@ -192,9 +195,10 @@ int main(int argc, char **argv)
     //output the ngp grid
     sprintf(fname,"ngp.%d.dat",id);
     output_fft_grid(fname, u, grid_info, 0, nx, 0, ny, 0, nz, myid, numprocs, world);
+    printf("output...\n");
 
     //compute <|df(k)|^2>
-    dfk = grid_dfk(u,grid_info,world);
+    dfk = grid_dfk(N,u,grid_info,world);
 
     //output the grid
     sprintf(fname,"dfk.%d.dat",id);
@@ -202,12 +206,15 @@ int main(int argc, char **argv)
 
     
 
-    FILE *fp;
-    sprintf(fname,"particles.%d.dat",id);
-    fp = fopen(fname,"w");
-    for(int i=0;i<N;i++)
-      fprintf(fp,"%e\t%e\t%e\n",p.x[i],p.y[i],p.z[i]);
-    fclose(fp);
+    if(id==0)
+    {
+      FILE *fp;
+      sprintf(fname,"particles.%d.dat",id);
+      fp = fopen(fname,"w");
+      for(int i=0;i<N;i++)
+        fprintf(fp,"%e\t%e\t%e\n",p.x[i],p.y[i],p.z[i]);
+      fclose(fp);
+    }
 
     free(p.x);
     free(p.y);

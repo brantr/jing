@@ -1,6 +1,8 @@
 #include <math.h>
 #include "grid_pk.h"
 
+//#define CONTINUOUS
+
 double *grid_ngp(double *x, double *y, double *z, double *m, int N, FFTW_Grid_Info grid_info)
 {
   //create a new grid
@@ -19,6 +21,14 @@ double *grid_ngp(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
 
   //create the grid
   double *u = allocate_real_fftw_grid(grid_info);
+
+  for(ix=0;ix<nx;ix++)
+    for(iy=0;iy<ny;iy++)
+      for(iz=0;iz<nz;iz++)
+      {
+        ijk = grid_ijk(ix,iy,iz,grid_info);
+        u[ijk] = 0.0;
+      }
 
   //loop over the particles and assign them
   //to the grid using NGP
@@ -81,11 +91,13 @@ double w_p(int p, double kx, double ky, double kz, FFTW_Grid_Info grid_info)
   return pow( sin(k1)*sin(k2)*sin(k3)/(k1*k2*k3), p);
 }
 
-double *grid_dfk(double *u, FFTW_Grid_Info grid_info, MPI_Comm world)
+double *grid_dfk(int N, double *u, FFTW_Grid_Info grid_info, MPI_Comm world)
 {
   int nx       = grid_info.nx;
   int ny       = grid_info.ny;
   int nz       = grid_info.nz;
+
+  //double N = 0; //number of objects
 
   //normalization
   double scale = 1./( ((double) grid_info.nx)*((double) grid_info.ny)*((double) grid_info.nz) );
@@ -103,36 +115,111 @@ double *grid_dfk(double *u, FFTW_Grid_Info grid_info, MPI_Comm world)
   uk    = allocate_complex_fftw_grid(grid_info);
 
   //create the fftw plans
-  plan  = fftw_mpi_plan_dft_3d(grid_info.nx, grid_info.ny, grid_info.nz, uk, uk, world, FFTW_FORWARD,  FFTW_ESTIMATE);
+  //plan  = fftw_mpi_plan_dft_3d(grid_info.nx, grid_info.ny, grid_info.nz, uk, uk, world, FFTW_FORWARD,  FFTW_ESTIMATE);
+  plan  = fftw_mpi_plan_dft_r2c_3d(grid_info.nx, grid_info.ny, grid_info.nz, u, uk, world, FFTW_ESTIMATE);
 
   //get complex version of A
-  grid_copy_real_to_complex_in_place(u, uk, grid_info);
+  //grid_copy_real_to_complex_in_place(u, uk, grid_info);
 
   //perform the forward transform on the components of u
   fftw_execute(plan);
+
+  //compute dfk
+#ifndef CONTINUOUS
+
+  for(int i=0;i<nx;i++)
+    for(int j=0;j<ny;j++)
+      for(int k=0;k<(nz+1)/2;++k)
+      {
+        ijk  = grid_ijk(i,j,k,grid_info);
+        ijkc = grid_complex_ijk(i,j,k,grid_info);
+        uk[ijkc][0]/=((double) N);
+        uk[ijkc][1]/=((double) N);
+      }
+  if(nz%2==0)
+    for(int i=0;i<nx;i++)
+      for(int j=0;j<ny;j++)
+        for(int k=nz/2;k<nz/2+1;k++)
+        {
+          ijk  = grid_ijk(i,j,k,grid_info);
+          ijkc = grid_complex_ijk(i,j,k,grid_info);
+          uk[ijkc][0]/=((double) N);
+          uk[ijkc][1]/=((double) N);
+        }
+  uk[0][0] -= 1.0;
+#endif // CONTINUOUS
+  printf("DC = %e %e\n",uk[0][0],uk[0][1]);
 
   double real_tot=0, img_tot=0;
 
   //find delta^f_k;
   for(int i=0;i<nx;i++)
     for(int j=0;j<ny;j++)
-      for(int k=0;k<nz;k++)
+      for(int k=0;k<(nz+1)/2;++k)
       {
         ijk  = grid_ijk(i,j,k,grid_info);
         ijkc = grid_complex_ijk(i,j,k,grid_info);
+        //printf("i %d j %d k %d ijk %d ijkc %d\n",i,j,k,ijk,ijkc);
         real_tot += uk[ijkc][0];
         img_tot  += uk[ijkc][1];
 
         dfk[ijk] = uk[ijkc][0]*uk[ijkc][0] + uk[ijkc][1]*uk[ijkc][1];
-        dfk[ijk] *= (scale*scale); // one for each factor of u
+        //dfk[ijk] *= (scale*scale); // one for each factor of u
+#ifdef CONTINUOUS
+        dfk[ijk] = uk[ijkc][0];
+        dfk[ijk] *= (scale); // one for each factor of u
+#endif //CONTINUOUS
+      }
+
+  //printf("check %e %e\n",uk[0][0]*scale,sqrt(dfk[0]));
+  if(nz%2==0)
+    for(int i=0;i<nx;i++)
+      for(int j=0;j<ny;j++)
+        for(int k=nz/2;k<nz/2+1;k++)
+        {
+          ijk  = grid_ijk(i,j,k,grid_info);
+          ijkc = grid_complex_ijk(i,j,k,grid_info);
+          //printf("i %d j %d k %d ijk %d ijkc %d\n",i,j,k,ijk,ijkc);
+          real_tot += uk[ijkc][0];
+          img_tot  += uk[ijkc][1];
+
+          dfk[ijk] = uk[ijkc][0]*uk[ijkc][0] + uk[ijkc][1]*uk[ijkc][1];
+          //dfk[ijk] *= (scale*scale);
         //dfk[ijk] = uk[ijkc][0];
         //dfk[ijk] *= (scale); // one for each factor of u
+#ifdef CONTINUOUS
+          dfk[ijk] = uk[ijkc][0];
+          dfk[ijk] *= (scale); // one for each factor of u
+#endif //CONTINUOUS
+        }
 
+
+  /*ijk  = grid_ijk(0,0,0,grid_info);
+  ijkc = grid_complex_ijk(i,j,k,grid_info);
+  dfk[ijk] = uk[ijkc][0]*uk[ijkc][0] + uk[ijkc][1]*uk[ijkc][1];
+  dfk[ijk] = uk[ijkc][0]*
+  for(int i=0;i<(nx+1)/2;++i)*/
+
+  printf("real_tot %e img_tot %e N %d\n",real_tot,img_tot,N);
+
+  //still need to normalize by number of objects
+
+  /*
+  double sum = 0;
+  for(int i=0;i<nx;i++)
+    for(int j=0;j<ny;j++)
+      for(int k=0;k<nz;k++)
+      {
+        ijk = grid_ijk(i,j,k,grid_info);
+        dfk[ijk]/=N;
+        sum += dfk[ijk];
       }
-  printf("real_tot %e img_tot %e\n",real_tot,img_tot);
 
-  //remove DC
+  printf("sum = %e\n",sum);
+
+  //and remove DC
   //dfk[0] -= 1.0;
+  */
 
   //free memory
   fftw_free(uk);

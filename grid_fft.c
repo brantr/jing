@@ -102,7 +102,9 @@ int grid_complex_ijk(int i, int j, int k, FFTW_Grid_Info grid_info)
 {
 	//no wrapping
 	//complex are nx x ny x nz
-	return (i*grid_info.ny + j)*grid_info.nz + k;
+	//return (i*grid_info.ny + j)*grid_info.nz + k;
+	return (i*grid_info.ny + j)*(grid_info.nz/2+1) + k;
+
 }
 
 
@@ -127,7 +129,7 @@ void initialize_mpi_local_sizes(FFTW_Grid_Info *grid_info, MPI_Comm world)
 	grid_info->nz_complex = grid_info->nz/2 + 1;
 
 	//find the local sizes for complex arrays
-	n_local_complex_size = fftw_mpi_local_size_3d(grid_info->nx, grid_info->ny, grid_info->nz, world, &nx_local, &nx_local_start);
+	n_local_complex_size = fftw_mpi_local_size_3d(grid_info->nx, grid_info->ny, grid_info->nz/2+1, world, &nx_local, &nx_local_start);
 
 	//remember the size
 	grid_info->nx_local       = nx_local;
