@@ -3,7 +3,7 @@
 
 //#define CONTINUOUS
 
-double *grid_ngp(double *x, double *y, double *z, double *m, int N, FFTW_Grid_Info grid_info)
+double *grid_ngp_alt(double *x, double *y, double *z, double *m, int N, FFTW_Grid_Info grid_info)
 {
   //create a new grid
   //with an NGP assignment
@@ -80,7 +80,168 @@ double *grid_ngp(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
   //return the grid
   return u;
 }
+double *grid_ngp(double *x, double *y, double *z, double *m, int N, FFTW_Grid_Info grid_info)
+{
+  //create a new grid
+  //with an NGP assignment
+  //of the particles
 
+  //grid sizes
+  int nx = grid_info.nx;
+  int ny = grid_info.ny;
+  int nz = grid_info.nz;
+
+  //grid indices
+  double dx, dy, dz;
+  int ix, iy, iz;
+  int ijk;
+
+  //create the grid
+  double *u = allocate_real_fftw_grid(grid_info);
+
+  for(ix=0;ix<nx;ix++)
+    for(iy=0;iy<ny;iy++)
+      for(iz=0;iz<nz;iz++)
+      {
+        ijk = grid_ijk(ix,iy,iz,grid_info);
+        u[ijk] = 0.0;
+      }
+
+  //loop over the particles and assign them
+  //to the grid using NGP
+  for(int i=0;i<N;i++)
+  {
+    dx = nx*x[i];
+    ix = floor(dx);
+    if(ix>=nx)
+      ix-=nx;
+    if(ix<0)
+      ix+=nx;
+
+    dy = ny*y[i];
+    iy = floor(dy);
+    if(iy>=ny)
+      iy-=ny;
+    if(iy<0)
+      iy+=ny;
+
+    dz = nz*z[i];
+    iz = floor(dz);
+    if(iz>=nz)
+      iz-=nz;
+    if(iz<0)
+      iz+=nz;
+
+    //get index on the grid
+    ijk = grid_ijk(ix,iy,iz,grid_info);
+
+    //add the particle to the grid
+    u[ijk] += m[i];
+  }
+
+  //return the grid
+  return u;
+}
+double *grid_cic(double *x, double *y, double *z, double *m, int N, FFTW_Grid_Info grid_info)
+{
+  //create a new grid
+  //with an CIC assignment
+  //of the particles
+
+  //grid sizes
+  int nx = grid_info.nx;
+  int ny = grid_info.ny;
+  int nz = grid_info.nz;
+
+  //grid indices
+  double dx, dy, dz;
+  int ix, iy, iz;
+  int ijk;
+  int i, j, k;
+
+  //create the grid
+  double *u = allocate_real_fftw_grid(grid_info);
+
+  for(ix=0;ix<nx;ix++)
+    for(iy=0;iy<ny;iy++)
+      for(iz=0;iz<nz;iz++)
+      {
+        ijk = grid_ijk(ix,iy,iz,grid_info);
+        u[ijk] = 0.0;
+      }
+
+  //loop over the particles and assign them
+  //to the grid using NGP
+  for(int n=0;n<N;n++)
+  {
+    dx = nx*x[n];
+    if(fmod(dx,1.) >= 0.5)
+    {
+      ix = floor(dx)+1;
+    }else{
+      ix = floor(dx);
+    }
+    dy = ny*y[n];
+    if(fmod(dy,1.) >= 0.5)
+    {
+      iy = floor(dy)+1;
+    }else{
+      iy = floor(dy);
+    }
+    dz = nz*z[n];
+    if(fmod(dz,1.) >= 0.5)
+    {
+      iz = floor(dz)+1;
+    }else{
+      iz = floor(dz);
+    }
+
+    for(int ii=ix-1;ii<ix+1;ii++)
+    {
+      i = ii;
+      if(ii<0)
+        i += nx;
+      if(ii>=nx)
+        i -= nx;
+
+      for(int jj=iy-1;jj<iy+1;jj++)
+      {
+        j = jj;
+        if(jj<0)
+          j += ny;
+        if(jj>=ny)
+          j -= ny;
+        for(int kk=iz-1;kk<iz+1;kk++)
+        {
+          k = kk;
+          if(kk<0)
+            k += nz;
+          if(kk>=nz)
+            k -= nz;
+
+          //ijk is the index of the cell
+          //xijk is the cell x position
+          //yijk is the cell y position
+          //zijk is the cell z position
+          xijk = (((double) ii)+0.5)/((double) nx);
+          yijk = (((double) jj)+0.5)/((double) ny);
+          zijk = (((double) kk)+0.5)/((double) nz);
+
+        }
+      }
+    }
+
+
+    //get index on the grid
+    ijk = grid_ijk(ix,iy,iz,grid_info);
+
+    //add the particle to the grid
+    u[ijk] += m[i];
+  }
+
+  //return the grid
+  return u;
+}
 double w_p(int p, double kx, double ky, double kz, FFTW_Grid_Info grid_info)
 {
   int nx = grid_info.nx;

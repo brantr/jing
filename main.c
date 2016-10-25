@@ -171,6 +171,8 @@ int main(int argc, char **argv)
   if(argc>=4)
     N = atoi(argv[3]);
 
+  printf("nx %d ns %d N %d\n",nx,ns,N);
+
   MPI_Init(&argc,&argv);
   MPI_Comm world = MPI_COMM_WORLD;
   MPI_Comm_rank(world,&myid);
