@@ -154,6 +154,12 @@ double *grid_cic(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
   int nz = grid_info.nz;
 
   //grid indices
+  double dcx = 1./((double) nx);
+  double dcy = 1./((double) ny);
+  double dcz = 1./((double) nz);
+
+  double xijk, yijk, zijk;
+
   double dx, dy, dz;
   int ix, iy, iz;
   int ijk;
@@ -195,6 +201,7 @@ double *grid_cic(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
     }else{
       iz = floor(dz);
     }
+    //printf("ix %d iy %d iz %d\n",ix,iy,iz);
 
     for(int ii=ix-1;ii<ix+1;ii++)
     {
@@ -223,9 +230,14 @@ double *grid_cic(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
           //xijk is the cell x position
           //yijk is the cell y position
           //zijk is the cell z position
-          xijk = (((double) ii)+0.5)/((double) nx);
-          yijk = (((double) jj)+0.5)/((double) ny);
-          zijk = (((double) kk)+0.5)/((double) nz);
+          ijk = grid_ijk(i,j,k,grid_info);
+          xijk = (((double) ii)+0.5)*dcx;
+          yijk = (((double) jj)+0.5)*dcy;
+          zijk = (((double) kk)+0.5)*dcz;
+
+          //printf("i %d j %d k %d\n",i,j,k);
+
+          u[ijk] += m[n]*(1.0 - fabs(x[n]-xijk)/dcx )*(1.0 - fabs(y[n]-yijk)/dcy )*(1.0 - fabs(z[n]-zijk)/dcz );
 
         }
       }
@@ -233,10 +245,10 @@ double *grid_cic(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
 
 
     //get index on the grid
-    ijk = grid_ijk(ix,iy,iz,grid_info);
+    //ijk = grid_ijk(ix,iy,iz,grid_info);
 
     //add the particle to the grid
-    u[ijk] += m[i];
+    //u[ijk] += m[i];
   }
 
   //return the grid

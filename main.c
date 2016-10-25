@@ -191,7 +191,9 @@ int main(int argc, char **argv)
     //printf("p[0] %e %e %e\n",p.x[0],p.y[0],p.z[0]);
 
     //grid particles
-    u = grid_ngp(p.x,p.y,p.z,p.m,N,grid_info);
+    //u = grid_ngp(p.x,p.y,p.z,p.m,N,grid_info);
+    u = grid_cic(p.x,p.y,p.z,p.m,N,grid_info);
+
     //u =  grid_make_gaussian_kernel(A, sigma*grid_info.nx, grid_info);
 
     //output the ngp grid
