@@ -72,6 +72,26 @@ double *grid_make_gaussian_kernel(double A, double r_cells, FFTW_Grid_Info grid_
   /*return the answer*/
   return kernel;
 }
+void read_particle_distribution(struct Particle *p, int *N, char fname[200])
+{
+  FILE *fp;
+  float xb, yb, zb;
+  fp = fopen(fname,"r");
+  fscanf(fp,"%d\n",N);
+  p->m = (double *) calloc(*N,sizeof(double));
+  p->x = (double *) calloc(*N,sizeof(double));
+  p->y = (double *) calloc(*N,sizeof(double));
+  p->z = (double *) calloc(*N,sizeof(double));
+  for(int i=0;i<*N;i++)
+  {
+    fscanf(fp,"%f\t%f\t%f\n",&xb,&yb,&zb);
+    p->m[i] = 1.0;
+    p->x[i] = xb;
+    p->y[i] = yb;
+    p->z[i] = zb;
+  }
+  fclose(fp);
+}
 
 void create_normal_distribution(struct Particle *p, int N, double sigma)
 {
@@ -178,6 +198,9 @@ int main(int argc, char **argv)
   MPI_Comm_rank(world,&myid);
   MPI_Comm_size(world,&numprocs);
 
+  ns = 1;
+  sprintf(fname,"cosmo/snapshot/x.txt");
+
   initialize_mpi_local_sizes(&grid_info, world);
   for(int id=0;id<ns;id++)
   {
@@ -185,15 +208,17 @@ int main(int argc, char **argv)
     set_rng_gaussian_seed(1337+id);
 
     //create_normal_distribution(&p,N,sigma);
-    create_uniform_distribution(&p,N,A,id);
+    //create_uniform_distribution(&p,N,A,id);
+    read_particle_distribution(&p, &N, fname);
+    printf("N = %d\n",N);
 
 
     //printf("p[0] %e %e %e\n",p.x[0],p.y[0],p.z[0]);
 
     //grid particles
-    //u = grid_ngp(p.x,p.y,p.z,p.m,N,grid_info);
+    u = grid_ngp(p.x,p.y,p.z,p.m,N,grid_info);
     //u = grid_cic(p.x,p.y,p.z,p.m,N,grid_info);
-    u = grid_tsc(p.x,p.y,p.z,p.m,N,grid_info);
+    //u = grid_tsc(p.x,p.y,p.z,p.m,N,grid_info);
 
     //u =  grid_make_gaussian_kernel(A, sigma*grid_info.nx, grid_info);
 
