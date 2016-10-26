@@ -192,7 +192,8 @@ int main(int argc, char **argv)
 
     //grid particles
     //u = grid_ngp(p.x,p.y,p.z,p.m,N,grid_info);
-    u = grid_cic(p.x,p.y,p.z,p.m,N,grid_info);
+    //u = grid_cic(p.x,p.y,p.z,p.m,N,grid_info);
+    u = grid_tsc(p.x,p.y,p.z,p.m,N,grid_info);
 
     //u =  grid_make_gaussian_kernel(A, sigma*grid_info.nx, grid_info);
 

@@ -242,15 +242,127 @@ double *grid_cic(double *x, double *y, double *z, double *m, int N, FFTW_Grid_In
         }
       }
     }
-
-
-    //get index on the grid
-    //ijk = grid_ijk(ix,iy,iz,grid_info);
-
-    //add the particle to the grid
-    //u[ijk] += m[i];
   }
 
+  //return the grid
+  return u;
+}
+double *grid_tsc(double *x, double *y, double *z, double *m, int N, FFTW_Grid_Info grid_info)
+{
+  //create a new grid
+  //with an TSC assignment
+  //of the particles
+
+  //grid sizes
+  int nx = grid_info.nx;
+  int ny = grid_info.ny;
+  int nz = grid_info.nz;
+
+  //grid indices
+  double dcx = 1./((double) nx);
+  double dcy = 1./((double) ny);
+  double dcz = 1./((double) nz);
+
+  double xijk, yijk, zijk;
+
+  double dx, dy, dz;
+  int ix, iy, iz;
+  int ijk;
+  int i, j, k;
+  double wx, wy, wz;
+  double dxx, dyy, dzz;
+
+  //create the grid
+  double *u = allocate_real_fftw_grid(grid_info);
+
+  for(ix=0;ix<nx;ix++)
+    for(iy=0;iy<ny;iy++)
+      for(iz=0;iz<nz;iz++)
+      {
+        ijk = grid_ijk(ix,iy,iz,grid_info);
+        u[ijk] = 0.0;
+      }
+
+  //loop over the particles and assign them
+  //to the grid using NGP
+  for(int n=0;n<N;n++)
+  {
+    dx = nx*x[n];
+    ix = floor(dx);
+
+    dy = ny*y[n];
+    iy = floor(dy);
+
+    dz = nz*z[n];
+    iz = floor(dz);
+
+    double ucheck = 0;
+
+    for(int ii=ix-1;ii<ix+2;ii++)
+    {
+      i = ii;
+      if(ii<0)
+        i += nx;
+      if(ii>=nx)
+        i -= nx;
+
+      for(int jj=iy-1;jj<iy+2;jj++)
+      {
+        j = jj;
+        if(jj<0)
+          j += ny;
+        if(jj>=ny)
+          j -= ny;
+        for(int kk=iz-1;kk<iz+2;kk++)
+        {
+          k = kk;
+          if(kk<0)
+            k += nz;
+          if(kk>=nz)
+            k -= nz;
+
+          //ijk is the index of the cell
+          //xijk is the cell x position
+          //yijk is the cell y position
+          //zijk is the cell z position
+          ijk = grid_ijk(i,j,k,grid_info);
+          xijk = (((double) ii)+0.5)*dcx;
+          yijk = (((double) jj)+0.5)*dcy;
+          zijk = (((double) kk)+0.5)*dcz;
+
+          dxx = (x[n]-xijk)/dcx;
+          dyy = (y[n]-yijk)/dcy;
+          dzz = (z[n]-zijk)/dcz;
+
+          if(fabs(dxx)<0.5)
+          {
+            wx = 0.75-dxx*dxx;
+          }else if (fabs(dxx)<1.5){
+            wx = 0.5*pow(1.5-fabs(dxx),2);
+          }else{
+            wx = 0;
+          }
+          if(fabs(dyy)<0.5)
+          {
+            wy = 0.75-dyy*dyy;
+          }else if (fabs(dyy)<1.5){
+            wy = 0.5*pow(1.5-fabs(dyy),2);
+          }else{
+            wy = 0;
+          }
+          if(fabs(dzz)<0.5)
+          {
+            wz = 0.75-dzz*dzz;
+          }else if (fabs(dzz)<1.5){
+            wz = 0.5*pow(1.5-fabs(dzz),2);
+          }else{
+            wz = 0;
+          }
+          u[ijk] += m[n]*wx*wy*wz;
+        }
+      }
+    }
+  }
   //return the grid
   return u;
 }
@@ -356,43 +468,16 @@ double *grid_dfk(int N, double *u, FFTW_Grid_Info grid_info, MPI_Comm world)
           real_tot += uk[ijkc][0];
           img_tot  += uk[ijkc][1];
 
+          //get |d^f(k)|^2
           dfk[ijk] = uk[ijkc][0]*uk[ijkc][0] + uk[ijkc][1]*uk[ijkc][1];
-          //dfk[ijk] *= (scale*scale);
-        //dfk[ijk] = uk[ijkc][0];
-        //dfk[ijk] *= (scale); // one for each factor of u
 #ifdef CONTINUOUS
           dfk[ijk] = uk[ijkc][0];
           dfk[ijk] *= (scale); // one for each factor of u
 #endif //CONTINUOUS
         }
 
+  //printf("real_tot %e img_tot %e N %d\n",real_tot,img_tot,N);
 
-  /*ijk  = grid_ijk(0,0,0,grid_info);
-  ijkc = grid_complex_ijk(i,j,k,grid_info);
-  dfk[ijk] = uk[ijkc][0]*uk[ijkc][0] + uk[ijkc][1]*uk[ijkc][1];
-  dfk[ijk] = uk[ijkc][0]*
-  for(int i=0;i<(nx+1)/2;++i)*/
-
-  printf("real_tot %e img_tot %e N %d\n",real_tot,img_tot,N);
-
-  //still need to normalize by number of objects
-
-  /*
-  double sum = 0;
-  for(int i=0;i<nx;i++)
-    for(int j=0;j<ny;j++)
-      for(int k=0;k<nz;k++)
-      {
-        ijk = grid_ijk(i,j,k,grid_info);
-        dfk[ijk]/=N;
-        sum += dfk[ijk];
-      }
-
-  printf("sum = %e\n",sum);
-
-  //and remove DC
-  //dfk[0] -= 1.0;
-  */
 
   //free memory
   fftw_free(uk);
